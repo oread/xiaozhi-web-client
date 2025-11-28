@@ -58,7 +58,7 @@ If you are using [xiaozhi-esp32-server](https://github.com/xinnan-tech/xiaozhi-e
 WS_URL=ws://localhost:8000/xiaozhi/v1/
 
 # Device authentication token
-DEVICE_TOKEN=your_token
+DEVICE_TOKEN=123456son
 
 # Web server configuration
 WEB_PORT=5001

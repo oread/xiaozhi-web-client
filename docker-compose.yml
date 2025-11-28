@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   xiaozhi-web:
     build: .
@@ -7,8 +5,11 @@ services:
     ports:
       - "5001:5001"  # Web service port
       - "5002:5002"  # WebSocket proxy port
+    env_file:
+      - .env
     environment:
-      - WS_URL=ws://localhost:9005  # Replace with your server address
-      - WEB_PORT=5001
-      - PROXY_PORT=5002
+      - WS_URL=${WS_URL:-ws://host.docker.internal:9005}
+      - DEVICE_TOKEN=${DEVICE_TOKEN:-your_token}
+      - WEB_PORT=${WEB_PORT:-5001}
+      - PROXY_PORT=${PROXY_PORT:-5002}
     restart: unless-stopped
