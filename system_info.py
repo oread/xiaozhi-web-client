@@ -1,75 +1,75 @@
 # https://github.com/Huang-junsen/py-xiaozhi/blob/main/src/utils/system_info.py
-# 在导入 opuslib 之前处理 opus 动态库
+# Handle opus dynamic library before importing opuslib
 import ctypes
 import os
 import sys
 
 
 def setup_opus():
-    """设置 opus 动态库"""
+    """Set up opus dynamic library"""
     if hasattr(sys, "_opus_loaded"):
-        print("opus 库已由其他组件加载")
+        print("opus library already loaded by other components")
         return True
 
-    # 获取 opus.dll 的路径
-    # 开发环境路径
-    # 假设 system_info.py 在 src/utils 目录下，需要向上三级才能到达项目根目录
+    # Get path to opus.dll
+    # Development environment path
+    # Assuming system_info.py is in src/utils directory, need to go up three levels to reach project root
     opus_path = os.path.join(os.path.dirname(__file__), "libs", "windows", "opus.dll")
 
-    # 检查文件是否存在
+    # Check if file exists
     if os.path.exists(opus_path):
-        print(f"找到 opus 库文件: {opus_path}")
+        print(f"Found opus library file: {opus_path}")
     else:
-        print(f"警告: opus 库文件不存在于路径: {opus_path}")
-        # 尝试在其他可能的位置查找
+        print(f"Warning: opus library file does not exist at path: {opus_path}")
+        # Try to find in other possible locations
         if getattr(sys, "frozen", False):
             alternate_path = os.path.join(os.path.dirname(sys.executable), "opus.dll")
             if os.path.exists(alternate_path):
                 opus_path = alternate_path
-                print(f"在替代位置找到 opus 库文件: {opus_path}")
+                print(f"Found opus library file in alternate location: {opus_path}")
 
-    # 预加载 opus.dll
+    # Preload opus.dll
     try:
         opus_lib = ctypes.cdll.LoadLibrary(opus_path)
-        print(f"成功加载 opus 库: {opus_path}")
+        print(f"Successfully loaded opus library: {opus_path}")
         sys._opus_loaded = True
-        # 在成功加载后立即修补 find_library
+        # Immediately patch find_library after successful load
         _patch_find_library("opus", opus_path)
         return True
     except Exception as e:
-        print(f"加载 opus 库失败: {e}")
+        print(f"Failed to load opus library: {e}")
 
-        # 尝试使用系统路径查找
+        # Try to find using system path
         try:
             if sys.platform == "win32":
                 ctypes.cdll.LoadLibrary("opus")
-                print("已从系统路径加载 opus 库")
+                print("Loaded opus library from system path")
                 sys._opus_loaded = True
                 return True
             elif sys.platform == "darwin":  # macOS
                 ctypes.cdll.LoadLibrary("libopus.dylib")
-                print("已从系统路径加载 libopus.dylib")
+                print("Loaded libopus.dylib from system path")
                 sys._opus_loaded = True
                 return True
-            else:  # Linux 和其他 Unix 系统
-                # 尝试几种常见的库名称
+            else:  # Linux and other Unix systems
+                # Try several common library names
                 for lib_name in ["libopus.so.0", "libopus.so", "libopus.so.0.8.0"]:
                     try:
                         ctypes.cdll.LoadLibrary(lib_name)
-                        print(f"已从系统路径加载 {lib_name}")
+                        print(f"Loaded {lib_name} from system path")
                         sys._opus_loaded = True
                         return True
                     except:
                         continue
         except Exception as e2:
-            print(f"从系统路径加载 opus 库失败: {e2}")
+            print(f"Failed to load opus library from system path: {e2}")
 
-        print("确保 opus 动态库已正确安装或位于正确的位置")
+        print("Ensure opus dynamic library is correctly installed or in the correct location")
         return False
 
 
 def _patch_find_library(lib_name, lib_path):
-    """修补 ctypes.util.find_library 函数"""
+    """Patch ctypes.util.find_library function"""
     import ctypes.util
 
     original_find_library = ctypes.util.find_library

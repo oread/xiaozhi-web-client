@@ -13,36 +13,36 @@ from urllib.parse import urlparse
 from system_info import setup_opus 
 import sys
 
-# 在导入 opuslib 之前处理 opus 动态库
+# Handle opus dynamic library before importing opuslib
 setup_opus()
 try:
     import opuslib
 except Exception as e:
-    print(f"导入 opuslib 失败: {e}")
-    print("请确保 opus 动态库已正确安装或位于正确的位置")
+    print(f"Failed to import opuslib: {e}")
+    print("Please ensure opus dynamic library is correctly installed or in the correct location")
     sys.exit(1)
 
 load_dotenv()
 
-# 配置
+# Configuration
 WS_URL = os.getenv("WS_URL")
 if not WS_URL:
-    print("警告: 未设置WS_URL环境变量，请检查.env文件")
-    WS_URL = "ws://localhost:9005"  # 默认值改为localhost
+    print("Warning: WS_URL environment variable not set, please check .env file")
+    WS_URL = "ws://localhost:9005"  # Default value changed to localhost
 
 TOKEN = os.getenv("DEVICE_TOKEN")
 if not TOKEN:
-    print("警告: 未设置DEVICE_TOKEN环境变量，请检查.env文件")
-    TOKEN = "123"  # 默认值
+    print("Warning: DEVICE_TOKEN environment variable not set, please check .env file")
+    TOKEN = "123"  # Default value
 
 LOCAL_PROXY_URL = os.getenv("LOCAL_PROXY_URL", "ws://localhost:5002")
 try:
-    # 从LOCAL_PROXY_URL中提取主机和端口
+    # Extract host and port from LOCAL_PROXY_URL
     parsed_url = urlparse(LOCAL_PROXY_URL)
-    PROXY_HOST = '0.0.0.0'  # 总是监听在所有网络接口上
+    PROXY_HOST = '0.0.0.0'  # Always listen on all network interfaces
     PROXY_PORT = parsed_url.port or 5002
 except Exception as e:
-    print(f"解析LOCAL_PROXY_URL失败: {e}，使用默认值")
+    print(f"Failed to parse LOCAL_PROXY_URL: {e}, using default values")
     PROXY_HOST = '0.0.0.0'
     PROXY_PORT = 5002
 
@@ -61,56 +61,56 @@ def get_client_id():
     return CLIENT_ID
 
 def pcm_to_opus(pcm_data):
-    """将PCM音频数据转换为Opus格式"""
+    """Convert PCM audio data to Opus format"""
     try:
-        # 创建编码器：16kHz, 单声道, VOIP模式
+        # Create encoder: 16kHz, mono, VOIP mode
         encoder = opuslib.Encoder(16000, 1, 'voip')
         
         try:
-            # 确保PCM数据是Int16格式
+            # Ensure PCM data is Int16 format
             pcm_array = np.frombuffer(pcm_data, dtype=np.int16)
             
-            # 编码PCM数据，每帧960个采样点
+            # Encode PCM data, 960 samples per frame
             opus_data = encoder.encode(pcm_array.tobytes(), 960)  # 60ms at 16kHz
             return opus_data
             
         except opuslib.OpusError as e:
-            print(f"Opus编码错误: {e}, 数据长度: {len(pcm_data)}")
+            print(f"Opus encoding error: {e}, data length: {len(pcm_data)}")
             return None
             
     except Exception as e:
-        print(f"Opus初始化错误: {e}")
+        print(f"Opus initialization error: {e}")
         return None
 
 def opus_to_wav(opus_data):
-    """将Opus音频数据转换为WAV格式"""
+    """Convert Opus audio data to WAV format"""
     try:
-        # 创建解码器：16kHz, 单声道
+        # Create decoder: 16kHz, mono
         decoder = opuslib.Decoder(16000, 1)
         
         try:
-            # 解码Opus数据
-            pcm_data = decoder.decode(opus_data, 960)  # 使用960采样点
+            # Decode Opus data
+            pcm_data = decoder.decode(opus_data, 960)  # Use 960 samples
             if pcm_data:
-                # 将PCM数据转换为numpy数组
+                # Convert PCM data to numpy array
                 audio_array = np.frombuffer(pcm_data, dtype=np.int16)
                 
-                # 创建WAV文件
+                # Create WAV file
                 wav_io = io.BytesIO()
                 with wave.open(wav_io, 'wb') as wav:
-                    wav.setnchannels(1)  # 单声道
-                    wav.setsampwidth(2)  # 16位
+                    wav.setnchannels(1)  # Mono
+                    wav.setsampwidth(2)  # 16-bit
                     wav.setframerate(16000)  # 16kHz
                     wav.writeframes(audio_array.tobytes())
                 return wav_io.getvalue()
             return None
             
         except opuslib.OpusError as e:
-            print(f"Opus解码错误: {e}, 数据长度: {len(opus_data)}")
+            print(f"Opus decoding error: {e}, data length: {len(opus_data)}")
             return None
             
     except Exception as e:
-        print(f"音频处理错误: {e}")
+        print(f"Audio processing error: {e}")
         return None
 
 class AudioProcessor:
@@ -123,20 +123,20 @@ class AudioProcessor:
         self.buffer = np.array([], dtype=np.float32)
         
     def process_audio(self, input_data):
-        # 将输入数据转换为float32数组
+        # Convert input data to float32 array
         input_array = np.frombuffer(input_data, dtype=np.float32)
         
-        # 将新数据添加到缓冲区
+        # Add new data to buffer
         self.buffer = np.append(self.buffer, input_array)
         
         chunks = []
-        # 当缓冲区达到指定大小时处理数据
+        # Process data when buffer reaches specified size
         while len(self.buffer) >= self.buffer_size:
-            # 提取数据
+            # Extract data
             chunk = self.buffer[:self.buffer_size]
             self.buffer = self.buffer[self.buffer_size:]
             
-            # 转换为16位整数
+            # Convert to 16-bit integer
             pcm_data = (chunk * 32767).astype(np.int16)
             chunks.append(pcm_data.tobytes())
             
@@ -144,7 +144,7 @@ class AudioProcessor:
     
     def process_remaining(self):
         if len(self.buffer) > 0:
-            # 转换为16位整数
+            # Convert to 16-bit integer
             pcm_data = (self.buffer * 32767).astype(np.int16)
             self.buffer = np.array([], dtype=np.float32)
             return [pcm_data.tobytes()]
@@ -157,7 +157,7 @@ class WebSocketProxy:
         self.enable_token = os.getenv("ENABLE_TOKEN", "true").lower() == "true"
         self.token = os.getenv("DEVICE_TOKEN", "123")
         
-        # 根据 token 开关设置 headers
+        # Set headers based on token switch
         self.headers = {
             "Device-Id": self.device_id,
             "Client-Id": self.client_id,
@@ -167,13 +167,13 @@ class WebSocketProxy:
             self.headers["Authorization"] = f"Bearer {self.token}"
             
         self.audio_processor = AudioProcessor(buffer_size=960)
-        self.decoder = opuslib.Decoder(16000, 1)  # 创建一个持久的解码器实例
-        self.audio_buffer = bytearray()  # 改用 bytearray 存储音频数据
+        self.decoder = opuslib.Decoder(16000, 1)  # Create a persistent decoder instance
+        self.audio_buffer = bytearray()  # Use bytearray to store audio data
         self.is_first_audio = True
-        self.total_samples = 0  # 跟踪总采样数
+        self.total_samples = 0  # Track total samples
 
     def create_wav_header(self, total_samples):
-        """创建WAV文件头"""
+        """Create WAV file header"""
         header = bytearray(44)  # WAV header is 44 bytes
         
         # RIFF header
@@ -198,23 +198,23 @@ class WebSocketProxy:
         return header
 
     async def proxy_handler(self, websocket):
-        """处理来自浏览器的WebSocket连接"""
+        """Handle WebSocket connection from browser"""
         try:
             print(f"New client connection from {websocket.remote_address}")
             async with websockets.connect(WS_URL, extra_headers=self.headers) as server_ws:
                 print(f"Connected to server with headers: {self.headers}")
                 
-                # 创建任务
+                # Create tasks
                 client_to_server = asyncio.create_task(self.handle_client_messages(websocket, server_ws))
                 server_to_client = asyncio.create_task(self.handle_server_messages(server_ws, websocket))
                 
-                # 等待任意一个任务完成
+                # Wait for any task to complete
                 done, pending = await asyncio.wait(
                     [client_to_server, server_to_client],
                     return_when=asyncio.FIRST_COMPLETED
                 )
                 
-                # 取消其他任务
+                # Cancel other tasks
                 for task in pending:
                     task.cancel()
                     
@@ -224,41 +224,41 @@ class WebSocketProxy:
             print("Client connection closed")
 
     async def handle_server_messages(self, server_ws, client_ws):
-        """处理来自服务器的消息"""
+        """Handle messages from server"""
         try:
             async for message in server_ws:
                 if isinstance(message, str):
                     try:
                         msg_data = json.loads(message)
                         if msg_data.get('type') == 'tts' and msg_data.get('state') == 'start':
-                            # 新的音频流开始，重置状态
-                            if len(self.audio_buffer) > 44:  # 如果还有未播放的数据，先发送
+                            # New audio stream starting, reset state
+                            if len(self.audio_buffer) > 44:  # If there's unplayed data, send it first
                                 size_bytes = (self.total_samples * 2 + 36).to_bytes(4, 'little')
                                 data_bytes = (self.total_samples * 2).to_bytes(4, 'little')
                                 self.audio_buffer[4:8] = size_bytes
                                 self.audio_buffer[40:44] = data_bytes
                                 await client_ws.send(bytes(self.audio_buffer))
                             
-                            # 完全重置状态
+                            # Completely reset state
                             self.audio_buffer = bytearray()
                             self.is_first_audio = True
                             self.total_samples = 0
-                            self.decoder = opuslib.Decoder(16000, 1)  # 重新创建解码器
+                            self.decoder = opuslib.Decoder(16000, 1)  # Recreate decoder
                             
                         elif msg_data.get('type') == 'tts' and msg_data.get('state') == 'stop':
-                            # 音频流结束，发送剩余数据
-                            if len(self.audio_buffer) > 44:  # 确保有音频数据
-                                # 更新最终的WAV头
+                            # Audio stream ended, send remaining data
+                            if len(self.audio_buffer) > 44:  # Ensure there is audio data
+                                # Update final WAV header
                                 size_bytes = (self.total_samples * 2 + 36).to_bytes(4, 'little')
                                 data_bytes = (self.total_samples * 2).to_bytes(4, 'little')
                                 self.audio_buffer[4:8] = size_bytes
                                 self.audio_buffer[40:44] = data_bytes
                                 await client_ws.send(bytes(self.audio_buffer))
                                 
-                                # 等待一小段时间确保音频播放完成
+                                # Wait briefly to ensure audio playback completes
                                 await asyncio.sleep(0.1)
                                 
-                                # 完全重置状态
+                                # Completely reset state
                                 self.audio_buffer = bytearray()
                                 self.is_first_audio = True
                                 self.total_samples = 0
@@ -269,43 +269,43 @@ class WebSocketProxy:
                         await client_ws.send(message)
                 else:
                     try:
-                        # 解码Opus数据
+                        # Decode Opus data
                         pcm_data = self.decoder.decode(message, 960)
                         if pcm_data:
-                            # 计算采样数
-                            samples = len(pcm_data) // 2  # 16位音频，每个采样2字节
+                            # Calculate number of samples
+                            samples = len(pcm_data) // 2  # 16-bit audio, 2 bytes per sample
                             self.total_samples += samples
 
                             if self.is_first_audio:
-                                # 第一个音频片段，写入WAV头
+                                # First audio fragment, write WAV header
                                 self.audio_buffer.extend(self.create_wav_header(self.total_samples))
                                 self.is_first_audio = False
                             
-                            # 添加音频数据
+                            # Add audio data
                             self.audio_buffer.extend(pcm_data)
                             
-                            # 当缓冲区达到一定大小时发送数据
-                            if len(self.audio_buffer) >= 32044:  # WAV头(44字节) + 16000个采样(32000字节)
-                                # 更新WAV头中的数据大小
+                            # Send data when buffer reaches certain size
+                            if len(self.audio_buffer) >= 32044:  # WAV header (44 bytes) + 16000 samples (32000 bytes)
+                                # Update data size in WAV header
                                 size_bytes = (self.total_samples * 2 + 36).to_bytes(4, 'little')
                                 data_bytes = (self.total_samples * 2).to_bytes(4, 'little')
                                 self.audio_buffer[4:8] = size_bytes
                                 self.audio_buffer[40:44] = data_bytes
                                 
-                                # 发送数据
+                                # Send data
                                 await client_ws.send(bytes(self.audio_buffer))
                                 
-                                # 完全重置缓冲区
+                                # Completely reset buffer
                                 self.audio_buffer = bytearray()
                                 self.is_first_audio = True
                                 self.total_samples = 0
                     except Exception as e:
-                        print(f"音频处理错误: {e}")
+                        print(f"Audio processing error: {e}")
         except Exception as e:
             print(f"Server message handling error: {e}")
 
     async def handle_client_messages(self, client_ws, server_ws):
-        """处理来自客户端的消息"""
+        """Handle messages from client"""
         try:
             async for message in client_ws:
                 if isinstance(message, str):
@@ -314,48 +314,48 @@ class WebSocketProxy:
                         if msg_data.get('type') == 'reset':
                             self.audio_processor.reset_buffer()
                         elif msg_data.get('type') == 'getLastData':
-                            # 处理剩余数据
+                            # Handle remaining data
                             remaining_chunks = self.audio_processor.process_remaining()
                             for chunk in remaining_chunks:
                                 opus_data = pcm_to_opus(chunk)
                                 if opus_data:
                                     await server_ws.send(opus_data)
-                            # 发送处理完成消息
+                            # Send processing complete message
                             await client_ws.send(json.dumps({'type': 'lastData'}))
                         else:
                             await server_ws.send(message)
                     except json.JSONDecodeError:
                         await server_ws.send(message)
                 else:
-                    print("处理客户端音频数据")
+                    print("Processing client audio data")
                     try:
-                        # 确保数据是 Float32Array 格式
+                        # Ensure data is Float32Array format
                         audio_data = np.frombuffer(message, dtype=np.float32)
                         if len(audio_data) > 0:
-                            # 使用AudioProcessor处理音频数据
+                            # Use AudioProcessor to process audio data
                             chunks = self.audio_processor.process_audio(audio_data.tobytes())
                             for chunk in chunks:
                                 opus_data = pcm_to_opus(chunk)
                                 if opus_data:
                                     await server_ws.send(opus_data)
                                 else:
-                                    print("音频编码失败")
+                                    print("Audio encoding failed")
                         else:
-                            print("收到空的音频数据")
+                            print("Received empty audio data")
                     except Exception as e:
-                        print(f"音频处理错误: {e}")
+                        print(f"Audio processing error: {e}")
         except Exception as e:
             print(f"Client message handling error: {e}")
 
     async def main(self):
-        """启动代理服务器"""
+        """Start proxy server"""
         print(f"Starting proxy server on {PROXY_HOST}:{PROXY_PORT}")
         print(f"Device ID: {self.device_id}")
         print(f"Token: {TOKEN}")
         print(f"Target WS URL: {WS_URL}")
         
         async with websockets.serve(self.proxy_handler, PROXY_HOST, PROXY_PORT):
-            await asyncio.Future()  # 运行直到被取消
+            await asyncio.Future()  # Run until canceled
 
 if __name__ == "__main__":
     proxy = WebSocketProxy()
